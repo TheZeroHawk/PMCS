@@ -1,0 +1,68 @@
+@keyframes textPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    font-size: 100%;
+  }
+  50% {
+    transform: scale(1.1);
+    font-size: 110%;
+  }
+}
+
+.animate-text-pulse {
+  animation: textPulse 1s ease-in-out infinite;
+  display: inline-block;
+}
+
+.critical-hit-text {
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 1.2em;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.7), 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+@keyframes criticalHitOuter {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+@keyframes criticalHitInner {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(5deg);
+  }
+}
+
+.animate-critical-text-outer {
+  display: inline-block;
+  animation: criticalHitOuter 0.5s ease-in-out infinite;
+}
+
+.animate-critical-text-inner {
+  display: inline-block;
+  animation: criticalHitInner 0.5s ease-in-out infinite;
+}
+
+.button-gradient {
+  background: linear-gradient(45deg, #4a5568, #2d3748);
+  transition: background 0.3s ease;
+}
+
+.button-gradient:hover {
+  background: linear-gradient(45deg, #2d3748, #1a202c);
+}
+
