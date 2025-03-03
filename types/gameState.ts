@@ -1,4 +1,4 @@
-import type { Character, AttackType, LogEntry, KiChannelingState } from "../types"
+import type { Character, AttackType, LogEntry, KiChannelingState } from "./index"
 
 export interface GameState {
   fighter1: Character
@@ -18,7 +18,6 @@ export interface GameState {
     | "fighter6"
     | "fighter7"
     | "fighter8"
-    | "beamClash"
   gameOver: boolean
   winner: Character | null
   log: LogEntry[]
@@ -81,4 +80,3 @@ export interface GameState {
   damageAdjustment: number
   turnHistory: GameState[]
 }
-

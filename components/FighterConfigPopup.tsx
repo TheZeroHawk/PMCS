@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useDispatch } from "react-redux"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -9,8 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { FIGHTERS } from "../config/fighters"
-import { ATTACK_TYPES } from "../config/moves"
+import type { Race } from "@/types"
+import { FIGHTERS } from "@/config/fighters"
+import { ATTACK_TYPES } from "@/config/moves"
 import {
   allMovesMoveset,
   defaultMoveset,
@@ -22,13 +22,22 @@ import {
   defaultMoveset_Duugo,
   SeiferBladesMoveset,
   spaceWarriorMoveset_Strong,
-} from "../config/movesets"
-import { updateFighterConfig } from "../store/gameSlice"
-import type { Race } from "../types"
+} from "@/config/movesets"
+import { updateFighterConfig } from "@/store/gameSlice"
 
 interface FighterConfigPopupProps {
   isOpen: boolean
   onClose: () => void
+}
+
+interface FighterConfig {
+  name: string
+  race: Race
+  basePowerLevel: number
+  currentPowerLevel: number
+  moveset: string[]
+  itemUses?: Record<string, number>
+  autoSkip: boolean
 }
 
 const movesetOptions = [
@@ -75,7 +84,7 @@ const getMovesetByName = (name: string) => {
 
 export const FighterConfigPopup: React.FC<FighterConfigPopupProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch()
-  const [fighterConfigs, setFighterConfigs] = useState(FIGHTERS)
+  const [fighterConfigs, setFighterConfigs] = useState<FighterConfig[]>(FIGHTERS)
 
   useEffect(() => {
     setFighterConfigs(FIGHTERS)
@@ -96,8 +105,8 @@ export const FighterConfigPopup: React.FC<FighterConfigPopupProps> = ({ isOpen, 
     handleConfigChange(fighter, "moveset", newMoveset)
 
     // Initialize item uses for the new moveset
-    const newItemUses = { ...fighterConfigs[fighter].itemUses }
-    newMoveset.forEach((move) => {
+    const newItemUses: Record<string, number> = {}
+    Array.from(newMoveset).forEach((move) => {
       const attackType = ATTACK_TYPES.find((attack) => attack.name === move)
       if (attackType && attackType.isHealingMove && !attackType.usesKi) {
         newItemUses[move] = newItemUses[move] || 1
@@ -150,138 +159,142 @@ export const FighterConfigPopup: React.FC<FighterConfigPopupProps> = ({ isOpen, 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-      <Card className="w-full max-w-4xl bg-gray-800 border-2 border-purple-500 max-h-[90vh] overflow-y-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl text-white">Fighter Configuration</CardTitle>
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+      <Card className="w-full max-w-2xl bg-gray-800 border-2 border-purple-500 shadow-lg">
+        <CardHeader className="bg-gray-700">
+          <CardTitle className="text-2xl text-white text-center">Configure Fighter</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {Object.entries(fighterConfigs).map(([fighter, config]) => (
-            <div key={fighter} className="mb-6 p-4 border border-gray-700 rounded">
-              <h3 className="text-xl text-white mb-2">{config.name}</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor={`${fighter}-name`} className="text-gray-200">
-                    Name
-                  </Label>
-                  <Input
-                    id={`${fighter}-name`}
-                    value={config.name}
-                    onChange={(e) => handleConfigChange(fighter, "name", e.target.value)}
-                    className="bg-gray-700 text-white"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`${fighter}-race`} className="text-gray-200">
-                    Race
-                  </Label>
-                  <Select value={config.race} onValueChange={(value) => handleConfigChange(fighter, "race", value)}>
-                    <SelectTrigger className="bg-gray-700 text-white">
-                      <SelectValue placeholder="Select a race" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {raceOptions.map((race) => (
-                        <SelectItem key={race} value={race}>
-                          {race}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor={`${fighter}-basePowerLevel`} className="text-gray-200">
-                    Base Power Level
-                  </Label>
-                  <Input
-                    id={`${fighter}-basePowerLevel`}
-                    type="number"
-                    value={config.basePowerLevel}
-                    onChange={(e) => handleConfigChange(fighter, "basePowerLevel", Number.parseInt(e.target.value))}
-                    className="bg-gray-700 text-white"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`${fighter}-currentPowerLevel`} className="text-gray-200">
-                    Current Power Level
-                  </Label>
-                  <Input
-                    id={`${fighter}-currentPowerLevel`}
-                    type="number"
-                    value={config.currentPowerLevel}
-                    onChange={(e) => handleConfigChange(fighter, "currentPowerLevel", Number.parseInt(e.target.value))}
-                    className="bg-gray-700 text-white"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`${fighter}-autoSkip`} className="text-gray-200">
-                    Auto Skip
-                  </Label>
-                  <Switch
-                    id={`${fighter}-autoSkip`}
-                    checked={config.autoSkip}
-                    onCheckedChange={(checked) => handleConfigChange(fighter, "autoSkip", checked)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`${fighter}-moveset`} className="text-gray-200">
-                    Moveset
-                  </Label>
-                  <Select onValueChange={(value) => handleMovesetChange(fighter, value)}>
-                    <SelectTrigger className="bg-gray-700 text-white">
-                      <SelectValue placeholder="Select a moveset" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {movesetOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div key={fighter} className="space-y-4">
+              <div>
+                <Label className="text-white">Name</Label>
+                <Input
+                  value={config.name}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    handleConfigChange(fighter, "name", e.target.value)
+                  }
+                  className="bg-gray-700 text-white"
+                />
               </div>
-              <div className="mt-4">
-                <Label className="text-gray-200">Current Moves</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {config.moveset.map((move) => (
-                    <Button
-                      key={move}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveMove(fighter, move)}
-                      className="bg-red-500 hover:bg-red-600 text-white"
-                    >
-                      {move} ✕
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-4">
-                <Label className="text-gray-200">Add Move</Label>
-                <Select onValueChange={(value) => handleAddMove(fighter, value)}>
+
+              <div>
+                <Label className="text-white">Race</Label>
+                <Select
+                  value={config.race}
+                  onValueChange={(value: Race) => handleConfigChange(fighter, "race", value)}
+                >
                   <SelectTrigger className="bg-gray-700 text-white">
-                    <SelectValue placeholder="Select a move to add" />
+                    <SelectValue>{config.race}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {ATTACK_TYPES.map((attack) => (
-                      <SelectItem key={attack.name} value={attack.name}>
-                        {attack.name}
+                    {raceOptions.map((race) => (
+                      <SelectItem key={race} value={race}>
+                        {race}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              <div>
+                <Label className="text-white">Base Power Level</Label>
+                <Input
+                  type="number"
+                  value={config.basePowerLevel}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    handleConfigChange(fighter, "basePowerLevel", parseInt(e.target.value))
+                  }
+                  className="bg-gray-700 text-white"
+                />
+              </div>
+
+              <div>
+                <Label className="text-white">Current Power Level</Label>
+                <Input
+                  type="number"
+                  value={config.currentPowerLevel}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    handleConfigChange(fighter, "currentPowerLevel", parseInt(e.target.value))
+                  }
+                  className="bg-gray-700 text-white"
+                />
+              </div>
+
+              <div>
+                <Label className="text-white">Moveset Preset</Label>
+                <Select
+                  value={config.moveset}
+                  onValueChange={(value: string) => handleMovesetChange(fighter, value)}
+                >
+                  <SelectTrigger className="bg-gray-700 text-white">
+                    <SelectValue>
+                      {value === "allMovesMoveset"
+                        ? "All Moves & Items"
+                        : value === "defaultMoveset"
+                        ? "Default moves"
+                        : value === "commonMoveset"
+                        ? "Common Moveset"
+                        : value === "commonMoveset_Android"
+                        ? "Common Moveset Android"
+                        : value === "commonMoveset_Duugo"
+                        ? "Common Moveset Duugo"
+                        : value === "spaceWarriorMoveset"
+                        ? "Space Warrior Moveset"
+                        : value === "spaceWarriorMoveset_Strong"
+                        ? "Space Warrior Moveset (Strong)"
+                        : value === "defaultMoveset_Android"
+                        ? "Default Moveset for Andriods"
+                        : value === "defaultMoveset_Duugo"
+                        ? "Default Moveset for Duugos"
+                        : "Seifer Blades Moveset"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {movesetOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-white flex items-center space-x-2">
+                  <span>Auto Skip Turn</span>
+                  <Switch
+                    checked={config.autoSkip}
+                    onCheckedChange={(checked: boolean) => handleConfigChange(fighter, "autoSkip", checked)}
+                  />
+                </Label>
+              </div>
+
+              <div>
+                <Label className="text-white">Custom Moves</Label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {ATTACK_TYPES.map((move) => (
+                    <Button
+                      key={move.name}
+                      onClick={() => handleAddMove(fighter, move.name)}
+                      variant="secondary"
+                      className="w-full"
+                    >
+                      {move.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </div>
           ))}
         </CardContent>
-        <CardFooter className="flex justify-end space-x-2">
-          <Button onClick={onClose} variant="outline">
+        <CardFooter className="bg-gray-700 justify-end space-x-2">
+          <Button onClick={onClose} variant="secondary">
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save Configuration</Button>
+          <Button onClick={handleSave}>Save Changes</Button>
         </CardFooter>
       </Card>
     </div>
   )
 }
-

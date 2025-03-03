@@ -1,8 +1,8 @@
 "use client"
 
 import { Provider } from "react-redux"
-import { store } from "../store/store"
-import { RPGCombat } from "../RPGCombat"
+import { store } from "@/store/store"
+import { RPGCombat } from "@/components/RPGCombat"
 
 export default function Home() {
   return (
@@ -26,21 +26,7 @@ export default function Home() {
             <li>Add ref cheat to append a Fight Log entry; manual entry for logging notes.</li>
           </ul>
         </div>
-        <style jsx>{`
-          .completed-task {
-            text-decoration: line-through;
-            text-decoration-color: #ff6b6b;
-            text-decoration-thickness: 2px;
-            color: #868e96;
-            transition: all 0.3s ease;
-          }
-          .completed-task:hover {
-            text-decoration-color: #ff8787;
-            color: #495057;
-          }
-        `}</style>
       </main>
     </Provider>
   )
 }
-

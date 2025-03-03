@@ -1,16 +1,17 @@
 "use client"
 
-import type React from "react"
+import * as React from "react"
 import { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FightLog } from "./FightLog"
-import type { AttackType, Character } from "./types"
-import { MOVE_CATEGORIES, ATTACK_TYPES } from "./config/moves"
-import { AttackButton } from "./utils/AttackButton"
-import type { RootState, AppDispatch } from "./store/store"
+import { FightLog } from "@/components/FightLog"
+import type { AttackType, Character } from "@/types"
+import type { GameState } from "@/types/gameState"
+import { MOVE_CATEGORIES, ATTACK_TYPES } from "@/config/moves"
+import { AttackButton } from "@/utils/AttackButton"
+import type { RootState, AppDispatch } from "@/store/store"
 import {
   performAttack,
   resetGame,
@@ -18,17 +19,16 @@ import {
   respondToSurrender,
   autoSkipTurn,
   rollbackTurn,
-} from "./store/gameSlice"
-import { DefensePopup } from "./components/DefensePopup"
-import { FighterConfigPopup } from "./components/FighterConfigPopup"
-import { RefCheatsPopup } from "./components/RefCheatsPopup"
-import TitleComponent from "./components/TitleComponent"
+} from "@/store/gameSlice"
+import { DefensePopup } from "@/components/DefensePopup"
+import { FighterConfigPopup } from "@/components/FighterConfigPopup"
+import { RefCheatsPopup } from "@/components/RefCheatsPopup"
+import TitleComponent from "@/components/TitleComponent"
 
-const getGrantedMoves = (
-  fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8",
-  gameState: any,
-): string[] => {
-  const activeToggles = gameState[`${fighter}ActiveToggles`]
+type FighterKey = "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
+
+const getGrantedMoves = (fighter: FighterKey, gameState: GameState): string[] => {
+  const activeToggles = getActiveToggles(gameState, fighter)
   const grantedMoves: string[] = []
 
   activeToggles.forEach((toggleName: string) => {
@@ -46,11 +46,11 @@ const getGrantedMoves = (
 }
 
 const getGrantedMoveUses = (
-  gameState: RootState["game"],
-  fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8",
+  gameState: GameState,
+  fighter: FighterKey,
   moveName: string,
 ): number | undefined => {
-  const activeToggles = gameState[`${fighter}ActiveToggles`]
+  const activeToggles = getActiveToggles(gameState, fighter)
   for (const toggleName of activeToggles) {
     const toggleAttack = ATTACK_TYPES.find((attack) => attack.name === toggleName)
     if (toggleAttack && toggleAttack.grantedMoves) {
@@ -63,11 +63,30 @@ const getGrantedMoveUses = (
   return undefined
 }
 
-export const RPGCombat: React.FC = () => {
+const getActiveToggles = (state: GameState, fighter: FighterKey): string[] => {
+  const key = `${fighter}ActiveToggles` as const
+  return state[key]
+}
+
+const getChargedMove = (state: GameState, fighter: FighterKey) => {
+  const key = `${fighter}ChargedMove` as const
+  return state[key]
+}
+
+const getKiChanneling = (state: GameState, fighter: FighterKey) => {
+  const key = `${fighter}KiChanneling` as const
+  return state[key]
+}
+
+const getFighter = (state: GameState, fighter: FighterKey): Character => {
+  return state[fighter]
+}
+
+export const RPGCombat = () => {
   const dispatch = useDispatch<AppDispatch>()
   const gameState = useSelector((state: RootState) => state.game)
   const currentDamageAdjustment = useSelector((state: RootState) => state.game.damageAdjustment)
-  const [animatedPowerLevels, setAnimatedPowerLevels] = useState({
+  const [animatedPowerLevels, setAnimatedPowerLevels] = React.useState<Record<FighterKey, number>>({
     fighter1: 0,
     fighter2: 0,
     fighter3: 0,
@@ -77,9 +96,8 @@ export const RPGCombat: React.FC = () => {
     fighter7: 0,
     fighter8: 0,
   })
-  const [showSurrenderResult, setShowSurrenderResult] = useState<"accepted" | "rejected" | null>(null)
-  const showBeamClashPopup = useSelector((state: RootState) => state.game.showBeamClashPopup)
-  const [currentTargets, setCurrentTargets] = useState<Record<string, string>>({
+  const [showSurrenderResult, setShowSurrenderResult] = React.useState<"accepted" | "rejected" | null>(null)
+  const [currentTargets, setCurrentTargets] = React.useState<Record<FighterKey, FighterKey>>({
     fighter1: "fighter2",
     fighter2: "fighter1",
     fighter3: "fighter1",
@@ -89,32 +107,32 @@ export const RPGCombat: React.FC = () => {
     fighter7: "fighter1",
     fighter8: "fighter1",
   })
-  const [showConfigPopup, setShowConfigPopup] = useState(false)
-  const [showRefCheatsPopup, setShowRefCheatsPopup] = useState(false)
+  const [showConfigPopup, setShowConfigPopup] = React.useState(false)
+  const [showRefCheatsPopup, setShowRefCheatsPopup] = React.useState(false)
 
-  useEffect(() => {
+  React.useEffect(() => {
     setAnimatedPowerLevels({
-      fighter1: gameState.fighter1.powerLevel,
-      fighter2: gameState.fighter2.powerLevel,
-      fighter3: gameState.fighter3.powerLevel,
-      fighter4: gameState.fighter4.powerLevel,
-      fighter5: gameState.fighter5.powerLevel,
-      fighter6: gameState.fighter6.powerLevel,
-      fighter7: gameState.fighter7.powerLevel,
-      fighter8: gameState.fighter8.powerLevel,
+      fighter1: getFighter(gameState, "fighter1").powerLevel,
+      fighter2: getFighter(gameState, "fighter2").powerLevel,
+      fighter3: getFighter(gameState, "fighter3").powerLevel,
+      fighter4: getFighter(gameState, "fighter4").powerLevel,
+      fighter5: getFighter(gameState, "fighter5").powerLevel,
+      fighter6: getFighter(gameState, "fighter6").powerLevel,
+      fighter7: getFighter(gameState, "fighter7").powerLevel,
+      fighter8: getFighter(gameState, "fighter8").powerLevel,
     })
   }, [
-    gameState.fighter1.powerLevel,
-    gameState.fighter2.powerLevel,
-    gameState.fighter3.powerLevel,
-    gameState.fighter4.powerLevel,
-    gameState.fighter5.powerLevel,
-    gameState.fighter6.powerLevel,
-    gameState.fighter7.powerLevel,
-    gameState.fighter8.powerLevel,
+    getFighter(gameState, "fighter1").powerLevel,
+    getFighter(gameState, "fighter2").powerLevel,
+    getFighter(gameState, "fighter3").powerLevel,
+    getFighter(gameState, "fighter4").powerLevel,
+    getFighter(gameState, "fighter5").powerLevel,
+    getFighter(gameState, "fighter6").powerLevel,
+    getFighter(gameState, "fighter7").powerLevel,
+    getFighter(gameState, "fighter8").powerLevel,
   ])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (gameState.log.length > 0) {
       const lastLogEntry = gameState.log[gameState.log.length - 1]
       if (lastLogEntry.attackType === "Surrender Accepted") {
@@ -125,13 +143,13 @@ export const RPGCombat: React.FC = () => {
     }
   }, [gameState.log])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (gameState.gameOver) {
       setShowSurrenderResult(null)
     }
   }, [gameState.gameOver])
 
-  useEffect(() => {
+  React.useEffect(() => {
     const buttons = document.querySelectorAll("button")
     if (gameState.pendingDefense) {
       // Disable attack buttons when defense is pending
@@ -147,10 +165,11 @@ export const RPGCombat: React.FC = () => {
     }
   }, [gameState.pendingDefense])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (
-      gameState.currentTurn !== "beamClash" &&
-      (gameState[gameState.currentTurn].autoSkip || gameState.stunStatus[gameState.currentTurn].isStunned)
+      gameState.currentTurn &&
+      getFighter(gameState, gameState.currentTurn as FighterKey) &&
+      (getFighter(gameState, gameState.currentTurn as FighterKey).autoSkip || gameState.stunStatus[gameState.currentTurn]?.isStunned)
     ) {
       dispatch(autoSkipTurn())
     }
@@ -159,7 +178,7 @@ export const RPGCombat: React.FC = () => {
   const handleAttack = (
     attackType: AttackType,
     action: "use" | "charge" = "use",
-    fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8",
+    fighter: FighterKey,
     targets?: { [key: string]: number },
   ) => {
     if (attackType.name === "Surrender" && action === "use") {
@@ -173,11 +192,8 @@ export const RPGCombat: React.FC = () => {
     }
   }
 
-  const getArmorHealth = (
-    fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8",
-    attackType: AttackType,
-  ) => {
-    const activeToggles = gameState[`${fighter}ActiveToggles`]
+  const getArmorHealth = (fighter: FighterKey, attackType: AttackType) => {
+    const activeToggles = getActiveToggles(gameState, fighter)
     const armorToggle = ATTACK_TYPES.find(
       (attack) => attack.name === attackType.name && attack.isArmor && activeToggles.includes(attack.name),
     )
@@ -192,16 +208,11 @@ export const RPGCombat: React.FC = () => {
     return undefined
   }
 
-  const renderAttackButtons = (
-    category: string,
-    fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8",
-  ) => {
-    const currentFighter = gameState[fighter]
-    const chargedMove = gameState[`${fighter}ChargedMove`]
-    if (!currentFighter || !currentFighter.moves) {
-      console.error(`Game state or ${fighter} moves are undefined`)
-      return null
-    }
+  const renderAttackButtons = (category: string, fighter: FighterKey) => {
+    const currentFighter = getFighter(gameState, fighter)
+    const chargedMove = getChargedMove(gameState, fighter)
+    if (!currentFighter?.moves) return null
+
     const grantedMoves = getGrantedMoves(fighter, gameState)
     const attacksInCategory = ATTACK_TYPES.filter(
       (attack) =>
@@ -242,14 +253,18 @@ export const RPGCombat: React.FC = () => {
                 remainingItemUses={
                   attackType.isHealingMove && !attackType.usesKi ? currentFighter.itemUses[attackType.name] : undefined
                 }
-                isActive={gameState[`${fighter}ActiveToggles`].includes(attackType.name)}
+                isActive={getActiveToggles(gameState, fighter).includes(attackType.name)}
                 lastUsedMove={gameState.lastUsedMove}
-                chargeLevel={chargedMove && chargedMove.moveName === attackType.name ? chargedMove.chargeLevel : 0}
+                chargeLevel={
+                  chargedMove?.moveName === attackType.name
+                    ? chargedMove.chargeLevel ?? 0
+                    : 0
+                }
                 category={category}
                 width={category === "Special" || category === "Transformations" ? "w-full" : "w-40"}
-                attackerPowerLevel={gameState[fighter === "fighter1" ? "fighter2" : "fighter1"].powerLevel}
+                attackerPowerLevel={getFighter(gameState, fighter === "fighter1" ? "fighter2" : "fighter1").powerLevel}
                 defenderPowerLevel={currentFighter.powerLevel}
-                activeToggles={gameState[`${fighter}ActiveToggles`]}
+                activeToggles={getActiveToggles(gameState, fighter)}
                 armorHealth={getArmorHealth(fighter, attackType)}
                 grantedMoveUses={getGrantedMoveUses(gameState, fighter, attackType.name)}
               />
@@ -267,7 +282,7 @@ export const RPGCombat: React.FC = () => {
   const renderPowerLevel = (
     character: Character,
     animatedPowerLevel: number,
-    fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8",
+    fighter: FighterKey,
   ) => {
     if (character.autoSkip) return null
     const activeFighterCount = getActiveFilterCount()
@@ -307,9 +322,9 @@ export const RPGCombat: React.FC = () => {
               }}
             />
           </div>
-          {gameState[`${fighter}KiChanneling`] && (
+          {getKiChanneling(gameState, fighter) && (
             <p className="text-sm text-yellow-400 mt-2">
-              Ki Channeling Active: {gameState[`${fighter}KiChanneling`].attacksRemaining} attacks remaining
+              Ki Channeling Active: {getKiChanneling(gameState, fighter)?.attacksRemaining} attacks remaining
             </p>
           )}
           {gameState.stunStatus[fighter].isStunned && (
@@ -333,8 +348,8 @@ export const RPGCombat: React.FC = () => {
     dispatch(respondToSurrender(accept))
   }
 
-  const SurrenderResponsePrompt: React.FC = () => {
-    const surrenderingFighter = gameState.pendingSurrender === "fighter1" ? gameState.fighter1 : gameState.fighter2
+  const SurrenderResponsePrompt = () => {
+    const surrenderingFighter = gameState.pendingSurrender ? getFighter(gameState, gameState.pendingSurrender) : null
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -343,7 +358,7 @@ export const RPGCombat: React.FC = () => {
             <CardTitle className="text-2xl text-white">Surrender Attempt</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-white">{surrenderingFighter.name} is attempting to surrender. Do you accept?</p>
+            <p className="text-white">{surrenderingFighter?.name} is attempting to surrender. Do you accept?</p>
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button onClick={() => handleRespondToSurrender(true)} className="bg-green-500 hover:bg-green-600">
@@ -358,7 +373,7 @@ export const RPGCombat: React.FC = () => {
     )
   }
 
-  const SurrenderResultPrompt: React.FC<{ result: "accepted" | "rejected" }> = ({ result }) => {
+  const SurrenderResultPrompt = ({ result }: { result: "accepted" | "rejected" }) => {
     const handleClick = () => {
       setShowSurrenderResult(null)
       if (result === "accepted") {
@@ -391,18 +406,8 @@ export const RPGCombat: React.FC = () => {
     )
   }
 
-  const renderTargetSelector = (
-    currentFighter:
-      | "fighter1"
-      | "fighter2"
-      | "fighter3"
-      | "fighter4"
-      | "fighter5"
-      | "fighter6"
-      | "fighter7"
-      | "fighter8",
-  ) => {
-    const activeFighters = [
+  const renderTargetSelector = (currentFighter: FighterKey) => {
+    const fighters = [
       "fighter1",
       "fighter2",
       "fighter3",
@@ -410,15 +415,16 @@ export const RPGCombat: React.FC = () => {
       "fighter5",
       "fighter6",
       "fighter7",
-      "fighter8",
-    ].filter((fighter) => fighter !== currentFighter && !gameState[fighter].autoSkip)
+      "fighter8"
+    ] satisfies FighterKey[];
+    const activeFighters = fighters.filter(fighter => fighter !== currentFighter && !getFighter(gameState, fighter).autoSkip)
 
     return (
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-2 gradient-text">Select Attack Target</h3>
         <Select
           onValueChange={(value) =>
-            setCurrentTargets((prev) => ({ ...prev, [currentFighter]: value as keyof typeof gameState }))
+            setCurrentTargets((prev) => ({ ...prev, [currentFighter]: value as FighterKey }))
           }
           value={currentTargets[currentFighter]}
         >
@@ -428,7 +434,7 @@ export const RPGCombat: React.FC = () => {
           <SelectContent className="bg-gray-800 border-2 border-purple-500">
             {activeFighters.map((fighter) => (
               <SelectItem key={fighter} value={fighter} className="text-white hover:bg-purple-700">
-                {gameState[fighter].name}
+                {getFighter(gameState, fighter).name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -447,14 +453,14 @@ export const RPGCombat: React.FC = () => {
       <TitleComponent version="v1.0.6" />
       {gameState && (
         <div className="grid grid-cols-12 gap-4 mb-8">
-          {renderPowerLevel(gameState.fighter1, animatedPowerLevels.fighter1, "fighter1")}
-          {renderPowerLevel(gameState.fighter2, animatedPowerLevels.fighter2, "fighter2")}
-          {renderPowerLevel(gameState.fighter3, animatedPowerLevels.fighter3, "fighter3")}
-          {renderPowerLevel(gameState.fighter4, animatedPowerLevels.fighter4, "fighter4")}
-          {renderPowerLevel(gameState.fighter5, animatedPowerLevels.fighter5, "fighter5")}
-          {renderPowerLevel(gameState.fighter6, animatedPowerLevels.fighter6, "fighter6")}
-          {renderPowerLevel(gameState.fighter7, animatedPowerLevels.fighter7, "fighter7")}
-          {renderPowerLevel(gameState.fighter8, animatedPowerLevels.fighter8, "fighter8")}
+          {renderPowerLevel(getFighter(gameState, "fighter1"), animatedPowerLevels.fighter1, "fighter1")}
+          {renderPowerLevel(getFighter(gameState, "fighter2"), animatedPowerLevels.fighter2, "fighter2")}
+          {renderPowerLevel(getFighter(gameState, "fighter3"), animatedPowerLevels.fighter3, "fighter3")}
+          {renderPowerLevel(getFighter(gameState, "fighter4"), animatedPowerLevels.fighter4, "fighter4")}
+          {renderPowerLevel(getFighter(gameState, "fighter5"), animatedPowerLevels.fighter5, "fighter5")}
+          {renderPowerLevel(getFighter(gameState, "fighter6"), animatedPowerLevels.fighter6, "fighter6")}
+          {renderPowerLevel(getFighter(gameState, "fighter7"), animatedPowerLevels.fighter7, "fighter7")}
+          {renderPowerLevel(getFighter(gameState, "fighter8"), animatedPowerLevels.fighter8, "fighter8")}
         </div>
       )}
       {gameState && (
@@ -464,11 +470,11 @@ export const RPGCombat: React.FC = () => {
           </Button>
         </div>
       )}
-      {gameState && gameState.currentTurn !== "beamClash" && (
+      {gameState && gameState.currentTurn && (
         <div className="mb-8">
           <div className="bg-gray-800 border-2 border-purple-500 rounded-lg p-4">
-            {renderTargetSelector(gameState.currentTurn)}
-            {MOVE_CATEGORIES.map((category) => renderAttackButtons(category, gameState.currentTurn))}
+            {renderTargetSelector(gameState.currentTurn as FighterKey)}
+            {MOVE_CATEGORIES.map((category) => renderAttackButtons(category, gameState.currentTurn as FighterKey))}
           </div>
         </div>
       )}
@@ -482,7 +488,9 @@ export const RPGCombat: React.FC = () => {
       </div>
       {gameState && gameState.gameOver && (
         <div className="mb-8 text-center animate-float">
-          <p className="text-3xl font-bold gradient-text mb-4">Game Over! {gameState.winner?.name} wins!</p>
+          <p className="text-3xl font-bold gradient-text mb-4">
+            Game Over! {gameState.winner && typeof gameState.winner === 'string' ? getFighter(gameState, gameState.winner as FighterKey)?.name : 'Unknown'} wins!
+          </p>
         </div>
       )}
       {gameState.pendingSurrender && <SurrenderResponsePrompt />}
@@ -504,9 +512,9 @@ export const RPGCombat: React.FC = () => {
       {gameState.pendingDefense && (
         <DefensePopup
           pendingDefense={gameState.pendingDefense}
-          attackerPowerLevel={gameState[gameState.pendingDefense.attacker].powerLevel}
-          defenderPowerLevel={gameState[gameState.pendingDefense.defender].powerLevel}
-          defenderMoveset={gameState[gameState.pendingDefense.defender].moves}
+          attackerPowerLevel={getFighter(gameState, gameState.pendingDefense.attacker).powerLevel}
+          defenderPowerLevel={getFighter(gameState, gameState.pendingDefense.defender).powerLevel}
+          defenderMoveset={getFighter(gameState, gameState.pendingDefense.defender).moves}
           gameState={gameState}
         />
       )}
@@ -517,4 +525,3 @@ export const RPGCombat: React.FC = () => {
 }
 
 export default RPGCombat
-

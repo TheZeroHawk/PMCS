@@ -1,12 +1,12 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { useEffect } from "react"
-import type { LogEntry } from "./types"
+import type { LogEntry } from "@/types"
 import { useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { exportLog } from "./utils/exportLog"
+import { exportLog } from "@/utils/exportLog"
 import { Copy } from "lucide-react"
 
 interface FightLogProps {
@@ -247,4 +247,3 @@ export const FightLog: React.FC<FightLogProps> = ({ log }) => {
     </div>
   )
 }
-

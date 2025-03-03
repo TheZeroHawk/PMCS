@@ -1,17 +1,18 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { useState, useEffect, useMemo } from "react"
-import { useSelector, useDispatch } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { adjustPowerLevels, adjustDamage, toggleAutoSkip, adjustArmorHealth } from "../store/gameSlice"
-import { ATTACK_TYPES } from "../config/moves"
-import type { RootState } from "../store/store"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { adjustPowerLevels, adjustDamage, toggleAutoSkip, adjustArmorHealth } from "@/store/gameSlice"
+import { ATTACK_TYPES } from "@/config/moves"
+import type { RootState } from "@/store/store"
 
 interface RefCheatsPopupProps {
   isOpen: boolean
@@ -247,4 +248,3 @@ export const RefCheatsPopup: React.FC<RefCheatsPopupProps> = ({ isOpen, onClose 
     </div>
   )
 }
-

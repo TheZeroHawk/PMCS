@@ -1,6 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
-import type { Character, AttackType, FighterConfig } from "../types"
-import type { GameState } from "../types/gameState"
+import type { Character, AttackType, FighterConfig, GameState } from "../types"
 import { initialState } from "./initialState"
 import { ATTACK_TYPES } from "../config/moves"
 import { useGrantedMove } from "../hooks/useGrantedMoves"
@@ -19,6 +18,8 @@ import { handleAutoSkipTurn as autoSkipTurnHandler } from "../handlers/autoSkipH
 import { handleRollback } from "../handlers/rollbackHandler"
 import { createCharacter } from "../utils/characterUtils"
 
+type FighterKey = "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
+
 const gameSlice = createSlice({
   name: "game",
   initialState,
@@ -28,8 +29,8 @@ const gameSlice = createSlice({
       action: PayloadAction<{
         attackType: AttackType
         action: "use" | "charge" | "toggle"
-        fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
-        target: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
+        fighter: FighterKey
+        target: FighterKey
         targets?: { [key: string]: number }
       }>,
     ) => {
@@ -351,315 +352,150 @@ const gameSlice = createSlice({
       console.log(`End of performAttack. Updated extraMoves: ${state.extraMoves}`)
       useGrantedMove(state, fighter, attackType.name)
     },
-    resetGame: (state) => {
-      const newState = { ...initialState }
-      Object.keys(state).forEach((key) => {
-        if (key.startsWith("fighter") && key.length === 8 && state[key]) {
-          newState[key] = createCharacter({
-            name: state[key].name,
-            basePowerLevel: state[key].basePowerLevel,
-            currentPowerLevel: state[key].basePowerLevel,
-            moveset: state[key].moves,
-            itemUses: state[key].itemUses,
-            autoSkip: state[key].autoSkip,
-          })
-        }
-      })
-      return newState
-    },
+    resetGame: () => initialState,
+
     setShowSurrenderPrompt: (state, action: PayloadAction<boolean>) => {
       state.showSurrenderPrompt = action.payload
     },
+
     respondToSurrender: (state, action: PayloadAction<boolean>) => {
-      const { updatedState } = handleRespondToSurrender(state, action.payload)
-      Object.assign(state, updatedState)
+      handleRespondToSurrender(state, action.payload)
     },
+
     updateChargedMove: (
       state,
       action: PayloadAction<{
         moveName: string
         chargeLevel: number
-        fighter: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
+        fighter: FighterKey
       }>,
     ) => {
       const { moveName, chargeLevel, fighter } = action.payload
       state[`${fighter}ChargedMove`] = { moveName, chargeLevel }
     },
-    attemptSurrender: (
-      state,
-      action: PayloadAction<
-        "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
-      >,
-    ) => {
-      const { updatedState } = handleSurrender(
-        state,
-        state[action.payload],
-        state[
-          action.payload === "fighter1"
-            ? "fighter2"
-            : action.payload === "fighter2"
-              ? "fighter3"
-              : action.payload === "fighter3"
-                ? "fighter4"
-                : action.payload === "fighter4"
-                  ? "fighter5"
-                  : action.payload === "fighter5"
-                    ? "fighter6"
-                    : action.payload === "fighter6"
-                      ? "fighter7"
-                      : action.payload === "fighter7"
-                        ? "fighter8"
-                        : "fighter1"
-        ],
-        { name: "Surrender" } as AttackType,
-        action.payload,
-      )
-      Object.assign(state, updatedState)
+
+    attemptSurrender: (state, action: PayloadAction<FighterKey>) => {
+      handleSurrender(state, action.payload)
     },
+
     setDefensePrompt: (state, action: PayloadAction<GameState["pendingDefense"]>) => {
       state.pendingDefense = action.payload
     },
+
     resolveDefense: (
       state,
       action: PayloadAction<{
         defenseType: AttackType
-        defender: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
+        defender: FighterKey
       }>,
     ) => {
       const { defenseType, defender } = action.payload
-      let attackerKey: string
-      let attackType: AttackType
+      const pendingDefense = state.pendingDefense
 
-      if (state.pendingDefense) {
-        attackerKey = state.pendingDefense.attacker
-        attackType = state.pendingDefense.attackType
-        const { damage, extraMoveCount, isCriticalHit, selfDamage, extraMoveGranted, newAttackerPowerLevel } =
-          state.pendingDefense
+      if (!pendingDefense) {
+        console.error("Cannot resolve defense: no pending defense")
+        return
+      }
 
-        const attacker = state[attackerKey]
+      const attacker = state[pendingDefense.attacker]
+      const defenderChar = state[defender]
 
-        // Ensure attacker and defender are valid fighter keys
-        const validFighters = [
-          "fighter1",
-          "fighter2",
-          "fighter3",
-          "fighter4",
-          "fighter5",
-          "fighter6",
-          "fighter7",
-          "fighter8",
-        ]
-        if (!validFighters.includes(attackerKey) || !validFighters.includes(defender)) {
-          console.error("Invalid attacker or defender:", { attacker: attackerKey, defender })
-          useGrantedMove(state, attackerKey, attackType.name)
-          return
-        }
+      // Handle different defense types
+      if (defenseType.isDodge) {
+        handleDodge(state, pendingDefense, defenderChar)
+      } else if (defenseType.isBlock) {
+        handleBlock(state, pendingDefense, defenderChar, defenseType)
+      } else if (defenseType.isReflect) {
+        handleReflect(state, pendingDefense, defenderChar, defenseType)
+      } else if (defenseType.isKiAbsorb) {
+        handleKiAbsorb(state, pendingDefense, defenderChar, defenseType)
+      } else {
+        // Handle "Nothing" or other defense types
+        const damage = pendingDefense.damage
 
-        // Add null checks for attacker and defender
-        if (!state[attackerKey] || !state[defender]) {
-          console.error("Attacker or defender is null:", { attacker: attackerKey, defender })
-          useGrantedMove(state, attackerKey, attackType.name)
-          return
-        }
-
+        // Apply armor damage reduction if applicable
         let finalDamage = damage
-        let defenseResult = "fail"
-        const chargeCleared = false
-        let chargeNote = ""
+        const activeToggles = state[`${defender}ActiveToggles`] as string[]
+        const armorAttacks = ATTACK_TYPES.filter(
+          (attack) => attack.isArmor && activeToggles.includes(attack.name),
+        )
 
-        let dodgeChance = 0
-        let dodgeSuccessful = false // Initialize dodgeSuccessful flag
-        // Dodge mechanics
-        if (defenseType.isDodge) {
-          const dodgeResult = handleDodge(state, attackerKey, defender, attackType)
-          dodgeChance = dodgeResult.dodgeChance
+        for (const armorAttack of armorAttacks) {
+          const armorDamageReduction = calculateArmorDamageReduction(armorAttack)
+          finalDamage = applyArmorReduction(
+            finalDamage,
+            armorDamageReduction,
+            pendingDefense.attackType.piercing || false,
+          )
 
-          if (dodgeResult.dodgeSuccess) {
-            finalDamage = 0
-            defenseResult = "full"
-            // If dodge is successful, set a flag to prevent stun application
-            dodgeSuccessful = true
-          }
+          // Update armor health
+          updateArmorHealth(state, defender, armorAttack, damage)
         }
 
-        // Block mechanics
-        if (defenseType.isBlock) {
-          const blockResult = handleBlock(state, attackerKey, defender, attackType, defenseType, damage)
-          defenseResult = blockResult.defenseResult
-          finalDamage = blockResult.finalDamage
-        }
+        defenderChar.powerLevel = Math.max(0, defenderChar.powerLevel - finalDamage)
 
-        // Reflect mechanics
-        if (defenseType.isReflect) {
-          const reflectResult = handleReflect(state, attackerKey, defender, attackType, defenseType, damage)
-          finalDamage = reflectResult.finalDamage
-          defenseResult = reflectResult.defenseResult
-          chargeNote = reflectResult.chargeNote
-        }
-
-        let kiAbsorbSuccessful = false // New flag to track Ki Absorb success
-
-        // Ki Absorb mechanics
-        if (defenseType.isKiAbsorb && attackType.usesKi) {
-          const kiAbsorbResult = handleKiAbsorb(state, attackerKey, defender, attackType, defenseType, finalDamage)
-          finalDamage = kiAbsorbResult.finalDamage
-          defenseResult = kiAbsorbResult.defenseResult
-          chargeNote = kiAbsorbResult.chargeNote
-
-          if (kiAbsorbResult.absorptionSuccess) {
-            state[defender].powerLevel += kiAbsorbResult.absorbedEnergy
-            state[defender].maxPowerLevel += kiAbsorbResult.absorbedEnergy
-            kiAbsorbSuccessful = true // Set the flag when Ki Absorb is successful
-          }
-        }
-
-        // Apply armor damage reduction
-        const armorDamageReduction = calculateArmorDamageReduction(defender, state)
-        finalDamage = applyArmorReduction(finalDamage, armorDamageReduction, attackType.piercing || false)
-
-        // Update defender's power level
-        state[defender].powerLevel = Math.max(0, state[defender].powerLevel - finalDamage)
-
-        // Apply damage to the defender's armor
-        updateArmorHealth(defender, state, finalDamage)
-
-        // Apply stun effect after defense resolution, with exception for Ki Absorb
-        if (
-          !dodgeSuccessful && // Only check if dodge was unsuccessful
-          attackType.stunChance &&
-          Math.random() < attackType.stunChance &&
-          (finalDamage > 0 || kiAbsorbSuccessful) // Allow stun chance if damage > 0 OR Ki Absorb was successful
-        ) {
-          state.stunStatus[defender] = {
-            isStunned: true,
-            turnsRemaining: attackType.stunDuration || 1,
-          }
-          chargeNote += ` ${state[defender].name} is stunned for ${attackType.stunDuration || 1} turn(s)!`
-        }
-
-        // Clear the charge if the defense is not "Nothing"
-        if (defenseType.name !== "Nothing") {
-          state[`${defender}ChargedMove`] = null
-        }
-
-        // Log the attack and defense as a single event
         state.log.push({
           turn: state.turn,
-          attacker: limitString(state[attackerKey].name),
-          defender: limitString(state[defender].name),
-          attackType: limitString(attackType.name),
-          defenseType: limitString(defenseType.name),
+          attacker: limitString(attacker.name),
+          defender: limitString(defenderChar.name),
+          attackType: "No Defense",
           damage: finalDamage,
-          remainingPowerLevel: state[defender].powerLevel,
-          blockResult: defenseResult as "partial" | "full" | "fail" | "absorbed" | "reflected",
-          dodgeChance: defenseType.isDodge ? dodgeChance : undefined,
-          extraMoveGranted: extraMoveGranted,
-          extraMoveCount: extraMoveCount,
-          isCriticalHit: isCriticalHit,
-          selfDamage: selfDamage,
-          attackerRemainingPowerLevel: newAttackerPowerLevel,
-          damagePreventedNote:
-            defenseResult === "full" && defenseType.isDodge
-              ? "Dodge successful! All damage prevented."
-              : defenseResult === "partial"
-                ? "1/4 of the damage was prevented"
-                : defenseResult === "full"
-                  ? "1/2 of the damage was prevented"
-                  : defenseResult === "absorbed"
-                    ? `Ki Absorb successful! All damage prevented.`
-                    : defenseResult === "reflected"
-                      ? `Reflect successful! All damage reflected.`
-                      : undefined,
-          chargeCleared: chargeCleared,
-          extraNote:
-            defenseResult === "absorbed" || defenseResult === "reflected"
-              ? chargeNote
-              : chargeCleared
-                ? chargeNote
-                : state.stunStatus[defender].isStunned
-                  ? chargeNote
-                  : undefined,
-          isPiercing: attackType.piercing || false,
+          remainingPowerLevel: defenderChar.powerLevel,
         })
 
-        // Update game state
-        state.lastDamage = finalDamage
-        state.lastUsedMove = attackType
-
-        // Handle extra moves
-        if (extraMoveGranted) {
-          state.extraMoves = 1 // Ensure only 1 extra move is granted
-          /*state.log.push({
-            turn: state.turn,
-            attacker: limitString(state[attacker].name),
-            defender: limitString(state[defender].name),
-            attackType: "Extra Move Granted",
-            damage: 0,
-            remainingPowerLevel: state[attacker].powerLevel,
-            extraNote: `${state[attacker].name} gained an extra move.`,
-          })*/
-          console.log(`Extra move confirmed for ${attackerKey}. extraMoves set to: ${state.extraMoves}`)
-        }
-
-        // Clear the pending defense
-        state.pendingDefense = null
-
-        // Advance turn if no extra moves
-        if (state.extraMoves > 0) {
-          state.extraMoves -= 1
-          console.log(`Extra move used. extraMoves now: ${state.extraMoves}`)
-          // Do not change the current turn, allowing the same fighter to go again
-        } else {
-          state.turn += 1
-          state.currentTurn = getNextFighter(attackerKey, state)
-          console.log(`Turn advanced. New current turn: ${state.currentTurn}`)
+        if (defenderChar.powerLevel <= 0) {
+          state.gameOver = true
+          state.winner = attacker
         }
       }
-      useGrantedMove(state, attackerKey, attackType.name)
+
+      state.pendingDefense = null
+      state.currentTurn = pendingDefense.attacker
     },
+
     autoSkipTurn: (state) => {
-      return autoSkipTurnHandler(state)
+      autoSkipTurnHandler(state)
     },
+
     updateFighterConfig: (state, action: PayloadAction<{ fighter: string; config: FighterConfig }>) => {
       const { fighter, config } = action.payload
       state[fighter as keyof typeof state] = createCharacter(config)
     },
+
     adjustPowerLevels: (state, action: PayloadAction<Record<string, { current: number; max: number }>>) => {
-      Object.entries(action.payload).forEach(([fighter, levels]) => {
+      Object.entries(action.payload).forEach(([fighter, { current, max }]) => {
         if (state[fighter as keyof typeof state]) {
-          const fighterState = state[fighter as keyof typeof state] as Character
-          fighterState.powerLevel = levels.current
-          fighterState.maxPowerLevel = levels.max
-          // Ensure current power level doesn't exceed max power level
-          if (fighterState.powerLevel > fighterState.maxPowerLevel) {
-            fighterState.powerLevel = fighterState.maxPowerLevel
-          }
+          ;(state[fighter as keyof typeof state] as Character).powerLevel = current
+          ;(state[fighter as keyof typeof state] as Character).maxPowerLevel = max
         }
       })
     },
+
     adjustDamage: (state, action: PayloadAction<number>) => {
       state.damageAdjustment = action.payload
     },
+
     rollbackTurn: (state, action: PayloadAction<number>) => {
-      return handleRollback(state, action.payload)
+      handleRollback(state, action.payload)
     },
+
     toggleAutoSkip: (state, action: PayloadAction<string>) => {
       const fighter = action.payload
-      if (state[fighter as keyof typeof state] && typeof state[fighter as keyof typeof state] === "object") {
-        const fighterState = state[fighter as keyof typeof state] as Character
-        fighterState.autoSkip = !fighterState.autoSkip
+      if (state[fighter as keyof typeof state]) {
+        ;(state[fighter as keyof typeof state] as Character).autoSkip = !(
+          state[fighter as keyof typeof state] as Character
+        ).autoSkip
       }
     },
-    adjustArmorHealth: (state, action: PayloadAction<{ fighter: string; armorName: string; newHealth: number }>) => {
-      const { fighter, armorName, newHealth } = action.payload
-      const fighterActiveToggles = state[`${fighter}ActiveToggles` as keyof GameState] as string[]
-      const armorIndex = fighterActiveToggles.findIndex((toggle) => toggle === armorName)
 
-      if (armorIndex !== -1) {
-        const armorAttack = ATTACK_TYPES.find((attack) => attack.name === armorName)
-        if (armorAttack && armorAttack.isArmor) {
-          armorAttack.currentArmorHealth = Math.max(0, Math.min(newHealth, armorAttack.maximumArmorHealth || 0))
-        }
+    adjustArmorHealth: (
+      state,
+      action: PayloadAction<{ fighter: string; armorName: string; newHealth: number }>,
+    ) => {
+      const { fighter, armorName, newHealth } = action.payload
+      const armorAttack = ATTACK_TYPES.find((attack) => attack.name === armorName)
+      if (armorAttack) {
+        armorAttack.currentArmorHealth = newHealth
       }
     },
   },
@@ -669,9 +505,9 @@ export const {
   performAttack,
   resetGame,
   setShowSurrenderPrompt,
+  respondToSurrender,
   updateChargedMove,
   attemptSurrender,
-  respondToSurrender,
   setDefensePrompt,
   resolveDefense,
   autoSkipTurn,
@@ -685,12 +521,10 @@ export const {
 
 export default gameSlice.reducer
 
-export function applyArmorReduction(damage: number, armorDamageReduction: number, piercing: boolean): number {
-  if (piercing) return damage
-  return Math.max(0, Math.floor(damage * (1 - armorDamageReduction)))
+function applyArmorReduction(damage: number, armorDamageReduction: number, piercing: boolean): number {
+  return piercing ? damage : Math.max(0, damage - armorDamageReduction)
 }
 
 function limitString(str: string, maxLength = 1000): string {
   return str.length > maxLength ? str.slice(0, maxLength) + "..." : str
 }
-

@@ -1,25 +1,27 @@
-import type React from "react"
+import React from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ATTACK_TYPES } from "../config/moves"
-import { resolveDefense } from "../store/gameSlice"
-import type { RootState } from "../store/store"
-import type { AttackType } from "../types"
-import { calculateDodgeChance } from "../utils/dodgeChanceCalculator"
-import { getGrantedMoves } from "../hooks/useGrantedMoves"
+import { ATTACK_TYPES } from "@/config/moves"
+import { resolveDefense } from "@/store/gameSlice"
+import type { RootState } from "@/store/store"
+import type { AttackType, GameState } from "@/types"
+import { calculateDodgeChance } from "@/utils/dodgeChanceCalculator"
+import { getGrantedMoves } from "@/hooks/useGrantedMoves"
+
+type FighterKey = "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6" | "fighter7" | "fighter8"
 
 interface DefensePopupProps {
   pendingDefense: {
-    defender: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6"
-    attacker: "fighter1" | "fighter2" | "fighter3" | "fighter4" | "fighter5" | "fighter6"
+    defender: FighterKey
+    attacker: FighterKey
     attackType: AttackType
     damage: number
   }
   attackerPowerLevel: number
   defenderPowerLevel: number
   defenderMoveset: string[]
-  gameState: RootState["game"]
+  gameState: GameState
 }
 
 export const DefensePopup: React.FC<DefensePopupProps> = ({
@@ -32,7 +34,7 @@ export const DefensePopup: React.FC<DefensePopupProps> = ({
   const dispatch = useDispatch()
   const pendingDefenseState = useSelector((state: RootState) => state.game.pendingDefense)
   const isDefenderCharging = useSelector(
-    (state: RootState) => state.game[pendingDefense.defender + "ChargedMove"] !== null,
+    (state: RootState) => state.game[`${pendingDefense.defender}ChargedMove` as keyof GameState] !== null,
   )
 
   if (!pendingDefense || !pendingDefenseState) {
@@ -100,4 +102,3 @@ export const DefensePopup: React.FC<DefensePopupProps> = ({
     </div>
   )
 }
-
